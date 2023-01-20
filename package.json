@@ -1,6 +1,9 @@
 {
   "name": "vsctermdebug",
   "displayName": "VSC Terminal Debug",
+  "extensionKind": [
+    "workspace"
+  ],
   "description": "Repro of terminal issues in VS Code",
   "version": "0.0.1",
   "engines": {
