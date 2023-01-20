@@ -8,17 +8,19 @@ import { createTerminal } from "./terminal";
 export async function activate(context: vscode.ExtensionContext) {
   // Use the console to output diagnostic information (console.log) and errors (console.error)
   // This line of code will only be executed once when your extension is activated
-  console.log('Congratulations, your extension "wintermrepro" is now active!');
+  console.log('Congratulations, your extension "vsctermdebug" is now active!');
 
   // The command has been defined in the package.json file
   // Now provide the implementation of the command with registerCommand
   // The commandId parameter must match the command field in package.json
   let disposable = vscode.commands.registerCommand(
-    "wintermrepro.helloWorld",
+    "vsctermdebug.helloWorld",
     async () => {
       // The code you place here will be executed every time your command is executed
       // Display a message box to the user
-      vscode.window.showInformationMessage("Hello World from WinTermRepro!");
+      vscode.window.showInformationMessage(
+        "Hello World from VSC TerminalDebug!"
+      );
 
       const terminal = await createTerminal("Sample Running Terminal");
 

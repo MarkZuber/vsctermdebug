@@ -1,7 +1,7 @@
 {
-  "name": "wintermrepro",
-  "displayName": "WinTermRepro",
-  "description": "Repro of terminal link issues on Windows",
+  "name": "vsctermdebug",
+  "displayName": "VSC Terminal Debug",
+  "description": "Repro of terminal issues in VS Code",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.74.0"
@@ -10,13 +10,13 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:wintermrepro.helloWorld"
+    "onCommand:vsctermdebug.helloWorld"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "wintermrepro.helloWorld",
+        "command": "vsctermdebug.helloWorld",
         "title": "Hello World"
       }
     ]
