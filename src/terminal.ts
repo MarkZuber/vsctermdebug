@@ -665,7 +665,11 @@ export class PtyImplementation implements Pty {
 }
 
 function getPtyFactory(ptyInfo: PtyInfo) {
-  return require(`${ptyInfo.vscodeAppRoot}/node_modules.asar/node-pty`);
+  try {
+    return require(`${ptyInfo.vscodeAppRoot}/node_modules.asar/node-pty`);
+  } catch {
+    return require(`${ptyInfo.vscodeAppRoot}/node_modules/node-pty`);
+  }
 }
 
 export class Deferred<T> {

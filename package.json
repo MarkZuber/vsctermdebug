@@ -5,6 +5,7 @@
     "workspace"
   ],
   "description": "Repro of terminal issues in VS Code",
+  "repository": "https://github.com/markzuber/vsctermdebug",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.74.0"
