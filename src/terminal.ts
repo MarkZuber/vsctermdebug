@@ -118,7 +118,7 @@ export class VSCodeTerminal extends EventEmitter {
       ...props,
       cwd: "/",
       // command: `cat ${this.pipeName}`,
-      command: `ls /Users/zube`,
+      command: `ls ${os.homedir()}`,
       onDidFinish: async (cancelledByUser, exitInfo) => {
         if (this.state === "started") {
           await this.stop({ cancelledByUser, exitInfo });
