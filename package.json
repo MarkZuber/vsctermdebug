@@ -14,14 +14,14 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:vsctermdebug.helloWorld"
+    "onCommand:vsctermdebug.termpathseptest"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "vsctermdebug.helloWorld",
-        "title": "Hello World"
+        "command": "vsctermdebug.termpathseptest",
+        "title": "Terminal Path Separator Test"
       }
     ]
   },

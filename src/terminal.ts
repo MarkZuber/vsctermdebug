@@ -7,33 +7,29 @@ import { inspect, promisify } from "util";
 import { exec } from "child_process";
 
 type SubProcess = { stdout: Readable; stderr: Readable };
-export type TaskProps = Omit<TaskComposerProps, "command" | "cwd">;
+type TaskProps = Omit<TaskComposerProps, "command" | "cwd">;
 
-export type ExitInfo = {
+type ExitInfo = {
   code: number;
   signal: number;
 };
 type OnDidFinishArgs = { cancelledByUser?: boolean; exitInfo?: ExitInfo };
 
-export const REMOTE_LAUNCHER_TERMINAL_TASK_SOURCE = "Remote Launcher";
+const REMOTE_LAUNCHER_TERMINAL_TASK_SOURCE = "Remote Launcher";
 
-export type CommandArgs = {
+type CommandArgs = {
   commandLine: string;
   onDidWriteOutput?: (output: string) => void;
-} & BaseArgs;
-
-type BaseArgs = {
   path?: string;
   environment?: Map<string, string>;
-  // terminalType?: TerminalType | string;
 };
 
-export type Command = {
+type Command = {
   file: string;
   args: Array<string>;
 };
 
-export type RunCommandResult = {
+type RunCommandResult = {
   // A promise returning the exit info if the command successfully finishes.
   commandPromise: Promise<ExitInfo | undefined>;
   // The pty to associate to a terminal.
@@ -44,39 +40,15 @@ export type RunCommandResult = {
   ready: vscode.Event<void>;
 };
 
-export function sleep(milliSeconds: number): Promise<void> {
+function sleep(milliSeconds: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, milliSeconds);
-  });
-}
-
-export function surfaceTerminalInProgressUI(): void {
-  // The task runner system that lets us show progress in the terminal doesn't get a reference to the actual `vscode.terminal` it runs in.
-  // Look for the next matching terminal that gets created, and use that as the terminal.
-  const listener = vscode.window.onDidOpenTerminal((terminal) => {
-    if (!terminal.name.startsWith(REMOTE_LAUNCHER_TERMINAL_TASK_SOURCE)) {
-      return;
-    }
-    setupTerminalListeners(terminal);
-    listener.dispose();
   });
 }
 
 let currentTerminal:
   | { terminal: vscode.Terminal; subscriptions: vscode.Disposable }
   | undefined;
-
-function setupTerminalListeners(terminal: vscode.Terminal) {
-  currentTerminal?.subscriptions.dispose?.();
-
-  const subscriptions = vscode.window.onDidCloseTerminal((closed) => {
-    if (closed === terminal) {
-      currentTerminal?.subscriptions.dispose?.();
-      currentTerminal = undefined;
-    }
-  });
-  currentTerminal = { terminal, subscriptions };
-}
 
 export async function createTerminal(title: string): Promise<VSCodeTerminal> {
   const result = new VSCodeTerminal(REMOTE_LAUNCHER_TERMINAL_TASK_SOURCE, {
@@ -85,7 +57,27 @@ export async function createTerminal(title: string): Promise<VSCodeTerminal> {
       reveal: undefined,
     },
   });
-  surfaceTerminalInProgressUI();
+
+  // The task runner system that lets us show progress in the terminal doesn't get a reference to the actual `vscode.terminal` it runs in.
+  // Look for the next matching terminal that gets created, and use that as the terminal.
+  const listener = vscode.window.onDidOpenTerminal((terminal) => {
+    if (!terminal.name.startsWith(REMOTE_LAUNCHER_TERMINAL_TASK_SOURCE)) {
+      return;
+    }
+
+    currentTerminal?.subscriptions.dispose?.();
+
+    const subscriptions = vscode.window.onDidCloseTerminal((closed) => {
+      if (closed === terminal) {
+        currentTerminal?.subscriptions.dispose?.();
+        currentTerminal = undefined;
+      }
+    });
+    currentTerminal = { terminal, subscriptions };
+
+    listener.dispose();
+  });
+
   return result;
 }
 
@@ -118,7 +110,7 @@ export class VSCodeTerminal extends EventEmitter {
       ...props,
       cwd: "/",
       // command: `cat ${this.pipeName}`,
-      command: `echo relative/path/to/a/file.txt && ls ${os.homedir()}`,
+      command: `echo relative/path/to/a/file.txt && echo && ls ${os.homedir()}`,
       onDidFinish: async (cancelledByUser, exitInfo) => {
         if (this.state === "started") {
           await this.stop({ cancelledByUser, exitInfo });
@@ -209,9 +201,7 @@ export class VSCodeTerminal extends EventEmitter {
     }
   }
 
-  /**
-   * Close the modular terminal. This includes a call to `stop()` if necessary.
-   */
+  // Close the modular terminal. This includes a call to `stop()` if necessary.
   async close() {
     switch (this.state) {
       case "created":
@@ -228,10 +218,7 @@ export class VSCodeTerminal extends EventEmitter {
   }
 }
 
-export function composeTask(
-  taskType: string,
-  props: TaskComposerProps
-): vscode.Task {
+function composeTask(taskType: string, props: TaskComposerProps): vscode.Task {
   const {
     cwd,
     env,
@@ -252,7 +239,7 @@ export function composeTask(
     : props.executionLogging;
 
   const callback = async () => {
-    if (onWillStart != null) {
+    if (onWillStart) {
       console.log("Invoking onWillStart()");
       await onWillStart();
     }
@@ -267,7 +254,6 @@ export function composeTask(
         environment: env,
         onDidWriteOutput,
       });
-    const notificationTitle = props.notificationTitle || props.title;
     const workerCallback = async () => {
       writeEmitter.fire(`Executing in directory: ${cwd}\r\n`);
       writeEmitter.fire(`${command}\r\n`);
@@ -280,48 +266,18 @@ export function composeTask(
         handleTaskCrash(title, error as Error, writeEmitter);
       }
 
-      const cancelledByUser = exitInfo == null;
-      if (cancelledByUser) {
-        console.log(`Task '${title}' was cancelled.`);
-        vscode.window.showInformationMessage(
-          `'${notificationTitle}' action was cancelled.`
-        );
-      } else {
-        console.log(`Task '${title}' finished with:`, exitInfo);
-      }
+      const cancelledByUser = exitInfo === null;
+      console.log(`Task '${title}' finished with:`, exitInfo);
 
-      if (onDidFinish != null) {
+      if (onDidFinish) {
         console.log("Invoking onDidFinish()");
         await onDidFinish(cancelledByUser, exitInfo);
       }
 
       pseudoTerminal.close();
     };
-    if (props.cancellable) {
-      ready(async () =>
-        vscode.window.withProgress(
-          {
-            cancellable: props.cancellable,
-            location: vscode.ProgressLocation.Notification,
-            title: notificationTitle,
-          },
-          async (
-            _progress: vscode.Progress<{
-              message?: string;
-              increment?: number;
-            }>,
-            token: vscode.CancellationToken
-          ) => {
-            token.onCancellationRequested(() => {
-              pseudoTerminal.close();
-            });
-            return workerCallback();
-          }
-        )
-      );
-    } else {
-      ready(async () => workerCallback());
-    }
+
+    ready(async () => workerCallback());
 
     return pseudoTerminal;
   };
@@ -334,7 +290,7 @@ export function composeTask(
     taskType,
     customExecution
   );
-  if (props.presentationOptions != null) {
+  if (props.presentationOptions) {
     task.presentationOptions = props.presentationOptions;
   }
   return task;
@@ -367,7 +323,7 @@ function handleTaskCrash(
   console.log(error.stack);
 }
 
-export async function runCommand(args: CommandArgs): Promise<RunCommandResult> {
+async function runCommand(args: CommandArgs): Promise<RunCommandResult> {
   const { commandLine, path, onDidWriteOutput, environment } = args;
 
   if (commandLine.trim().length < 1) {
@@ -441,13 +397,13 @@ export async function runCommand(args: CommandArgs): Promise<RunCommandResult> {
   };
 }
 
-export interface Pty {
+interface Pty {
   resize: (columns: number, rows: number) => void;
   writeInput: (data: string) => void;
   dispose: () => void;
 }
 
-export type PtyInfo = {
+type PtyInfo = {
   terminalType: string;
   environment?: Map<string, string>;
   cwd?: string;
@@ -468,15 +424,6 @@ async function spawnAndConnectTerminal(
   // We don't initialize the terminal's size, because the initial size is undefined until
   // the underlying terminal for the terminal renderer gets displayed in the window.
   pty.setDimensions = (newMaxDimensions: vscode.TerminalDimensions) => {
-    if (
-      newMaxDimensions == null ||
-      newMaxDimensions.columns == null ||
-      newMaxDimensions.rows == null
-    ) {
-      // Don't resize if we have no dimensions to resize to.
-      return;
-    }
-
     ptyInstance.resize(newMaxDimensions.columns, newMaxDimensions.rows);
   };
 
@@ -485,13 +432,13 @@ async function spawnAndConnectTerminal(
 
 function getCommand(info: PtyInfo, client: PtyClient): Command {
   // Client-specified command is highest precedence.
-  if (info.command != null) {
+  if (info.command) {
     return info.command;
   }
   throw new Error("need info.command");
 }
 
-export async function spawn(info: PtyInfo, client: PtyClient): Promise<Pty> {
+async function spawn(info: PtyInfo, client: PtyClient): Promise<Pty> {
   return new PtyImplementation(
     info,
     client,
@@ -500,7 +447,7 @@ export async function spawn(info: PtyInfo, client: PtyClient): Promise<Pty> {
   );
 }
 
-export interface TaskComposerProps {
+interface TaskComposerProps {
   readonly title: string;
   readonly cwd: string;
   readonly env?: Map<string, string>;
@@ -513,9 +460,6 @@ export interface TaskComposerProps {
     cancelledByUser: boolean,
     exitInfo: ExitInfo | undefined
   ) => Promise<void>;
-  readonly cancellable?: boolean;
-  // More descriptive title to show in the progress window or in notifications.
-  readonly notificationTitle?: string;
   // Log upon task execution
   readonly executionLogging?: <T>(operation: () => T) => T;
 }
@@ -528,7 +472,7 @@ function getDefaultEnvironment(): Map<string, string> {
   return env;
 }
 
-export async function getExecutionShellCommand(
+async function getExecutionShellCommand(
   client: PtyClient,
   commandLine: string
 ): Promise<Command> {
@@ -556,7 +500,7 @@ export async function getExecutionShellCommand(
   return command;
 }
 
-export interface PtyClient {
+interface PtyClient {
   onOutput: (data: string) => void;
   onExit: (code: number, signal: number) => void;
   dispose: () => void;
@@ -588,7 +532,7 @@ class CommandRendererPtyClient implements PtyClient {
   }
 }
 
-export class PtyImplementation implements Pty {
+class PtyImplementation implements Pty {
   _subscriptions: vscode.Disposable;
   _pty: any;
   _client: PtyClient;
@@ -604,7 +548,7 @@ export class PtyImplementation implements Pty {
     this._bytesOut = 0;
     this._initialization = {
       command: [command.file, ...command.args].join(" "),
-      cwd: info.cwd != null ? info.cwd : "",
+      cwd: info.cwd ?? "",
     };
 
     const subscriptions = (this._subscriptions = new vscode.Disposable(
@@ -672,7 +616,7 @@ function getPtyFactory(ptyInfo: PtyInfo) {
   }
 }
 
-export class Deferred<T> {
+class Deferred<T> {
   promise: Promise<T>;
   resolve: (value: T) => void = () => {
     throw new Error("resolve isn't set");
